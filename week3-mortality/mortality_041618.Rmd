@@ -1,0 +1,78 @@
+---
+title: "R Notebook for Tidy Tuesday"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook for the [#TidyTuesday](https://github.com/rfordatascience/tidytuesday/blob/master/README.md) challenge: a  weekly social data project (in R), which builds off #makeovermonday style projects but aimed at the R ecosystem. An emphasis will be placed on understanding how to summarize and arrange data to make meaningful charts with `ggplot2`, `tidyr`, `dplyr`, and other tools in the `tidyverse` ecosystem.
+
+This code is for Week 3, and my effort to recreate 
+
+[this image, from ourwordindata.org](https://ourworldindata.org/what-does-the-world-die-from), which generally looks like a colorful histogram tipped on its side
+
+```{r}
+library(tidyverse, quietly = TRUE, warn.conflicts = FALSE) 
+library(readxl) # To read in Excel data the tidyverse way
+library(viridisLite) #awesome color-blind friendly palette
+```
+
+#import data
+```{r}
+mortality <- read_excel("data/global_mortality.xlsx")
+mortality
+```
+#clean up the df with labels that match the graphs
+```{r}
+names(mortality) <- gsub(" (%)", "", names(mortality), fixed = TRUE)
+#took a long time to figure this step out; still unsure why fixed must == true, but that was the trick to make it work.
+names(mortality)
+
+mortality
+```
+
+
+#Annual number of deaths by cause, World, 2016
+First going to try to get to annual number of deaths across the world, filtered for 2016. Looking at data above, I'm notice two things: 
+1. World is one of the 'country' observations, so won't need to add up them all (as I thought)
+2. This excel file only has %s, so going to need world populations if I want to make the first graphs, which has total numver of deaths/year. Not sure where to find this yet, so will move on to graph #2, which is "share of deaths, by cause, World, 2016"
+
+#share of deaths, by cause, World, 2016
+All of these data are available in the df, so will start here.
+
+```{r}
+graph2 <- mortality %>% 
+  filter(country == "World", year == 2016) %>%  #get selected observations
+  mutate_at(vars(`Cardiovascular diseases`:Terrorism), funs(. / 100)) %>%  #convert to percent
+  gather(key = disease, value = percent, `Cardiovascular diseases`:Terrorism) %>%  #I want to graph disease vs. percent
+  arrange(desc(percent)) #probably don't need this
+graph2 #check your work
+
+```
+
+#make plot
+```{r}
+ggplot(graph2, aes(x = reorder(disease, percent), y = percent, fill = disease)) + #use reorder to rank these high to low.
+  geom_col() +
+  geom_text(aes(y = percent, label=paste(round(percent*100,2),"%")),
+            hjust = -0.2, size = 3, color = "grey30") + # set up labels on bars, and round in aes!!! thanks @dylanjm_ds for the pro tip
+  labs(title = "Share of deaths by cause, World, 2016", x = "", y = "") +
+  coord_flip() + 
+  scale_y_continuous(limits = c(0,0.35), breaks=c(0,.05,.10,.15,.20,.25,.30), minor_breaks = NULL, labels = scales::percent) +
+  guides(fill = FALSE) +
+  scale_color_gradientn(colours = rainbow(32)) +
+  theme_minimal()
+```
+#save
+```{r}
+ggsave("mortality.png", last_plot(), height = 8, width = 12, units = "in", dpi = 600)
+#default is last plot, but can name objects here
+```
+
+#conclusions
+Ran out of time to make it prettier; would have added thicker vertical lines to the major breaks, maybe tweaked the colors to channel my inner rainbow, added subtitle and sub-subtitle (what do you call the text at the bottom left?), and maybe tweaked the aestehtics a bit, make the minor grids not intersect with the labels. 
+
+Surprised how long these still take! But learned:
+* paste() in aes
+* if not fill() in aes, then no color!

@@ -1,0 +1,96 @@
+---
+title: "R Notebook for Tidy Tuesday"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook for the [#TidyTuesday](https://github.com/rfordatascience/tidytuesday/blob/master/README.md) challenge: a  weekly social data project (in R), which builds off #makeovermonday style projects but aimed at the R ecosystem. An emphasis will be placed on understanding how to summarize and arrange data to make meaningful charts with `ggplot2`, `tidyr`, `dplyr`, and other tools in the `tidyverse` ecosystem.
+
+This code is for Week 2, and my effort to recreate 
+
+![this image, from 538](https://espnfivethirtyeight.files.wordpress.com/2017/05/morris-nflrb-1.png?w=575&h=488&quality=90&strip=info)
+
+
+```{r}
+library(tidyverse, quietly = TRUE, warn.conflicts = FALSE) 
+library(readxl) # To read in Excel data the tidyverse way
+```
+
+#import data
+```{r}
+football <- read_excel("data/tidy_tuesday_week2.xlsx")
+football
+```
+#tidydata, and match names with labels
+```{r}
+football_adj <- football %>% 
+  rename(QB = Quarterback, RB = `Running Back`, S = Safety, ST = `Special Teamer`, TE = `Tight End`, WR = `Wide Receiver`, CB = Cornerback, DL = `Defensive Lineman`, LB = Linebacker, OL = `Offensive Lineman`)
+```
+
+
+#mutate data to divide by 1M
+```{r}
+football_adj <- football_adj %>% 
+  mutate_at(vars(CB:WR), funs(. / 1000000))
+```
+
+#select top 16 salares of each year, for each position
+```{r}
+football_16 <- football_adj %>% 
+  group_by(year) %>% 
+  top_n(16) %>% 
+  gather(key = position, value = salary, -year)
+football_16
+
+```
+
+#find means for line graph 
+Here is a code block in that I ultimately didn't, but thought I would. The image looked like a smooth fit mean line would 'fit' each of the years, so made an 'avg' df that I anticipated using. When I was bulidng the ggplot code block (below), discovered that ggplot would do this for me. Thanks ggplot!
+```{r}
+football_16_avg <- football_adj %>% 
+  group_by(year) %>% 
+  top_n(16) %>% 
+  summarise_each(funs(mean))
+football_16_avg
+
+```
+
+#need to get a mean for each year and each position (probably put in new df so you can add it as a ggplot element)
+Wasn't sure how to do this, so skipped it; but again, didn't need to.
+
+#plot
+```{r}
+football_16$position_f = factor(football_16$position, levels=c('RB', 'QB', 'OL', 'TE', 'WR', 'CB', 'DL', 'LB', 'S', 'ST'))
+
+ggplot(football_16) +
+  geom_jitter(aes(x = year, y = salary), alpha = 0.2) +
+  geom_smooth(aes(x = year, y = salary), color = "darkorange2", method = "auto", span = 0.4, se = FALSE) +
+  #coord_cartesian(ylim = c(0,25), xlim = c(2010,2020)) +
+  scale_y_continuous(limits = c(0,25), breaks=c(0,5,10,15,20,25), minor_breaks = NULL, labels = scales::dollar) +
+  scale_x_continuous(limits = c(2010,2020), breaks = c(2012,2014,2016,2018), minor_breaks = NULL, label = c("'12", "'14", "'16", "'18")) +
+  geom_hline(aes(yintercept = 0)) +
+  facet_wrap(~ position_f, ncol = 5) +
+  theme_minimal() +
+  labs(y = "Average cap value", x = "")
+
+```
+
+#save
+```{r}
+ggsave("nfl_salary.png", last_plot(), height = 8, width = 12, units = "in", dpi = 600)
+#default is last plot, but can name objects here
+```
+
+#Conclusion
+First step was to make an outline of anticipated steps to go from raw data to final image; I made these key headers of each section, and then began to work my way through. Ultimately I didn't need two of the anticipated steps. Here are some of the new things that I needed to learn/figure out for the final image:
+
+* ggplot
+* factor
+* top_n (to select top #)
+* mutate_at (to make a new df)
+* gather(key = position, value = salary, -year)
+* [ggsave](http://ggplot2.tidyverse.org/reference/ggsave.html)
+
+This was the closest that I've gotten to making the image look even remotely close; so needless to say, I'm hooked.

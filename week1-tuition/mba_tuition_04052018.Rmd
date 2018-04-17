@@ -1,0 +1,60 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+library(tidyverse) 
+library(readxl) # To read in Excel data the tidyverse way
+library(viridisLite) # For awesome, accessible color palettes
+```
+
+#import data
+```{r}
+us_avg_tuition <- read_excel("data/us_avg_tuition.xlsx")
+us_avg_tuition
+```
+
+```{r}
+us_avg_tuition <- us_avg_tuition %>% 
+  rename(state = State) %>% 
+  mutate(state_abb = factor(state.abb))
+us_avg_tuition
+```
+
+# Calculate the most recent 5-year % change in tuition and fees
+
+```{r}
+us_avg_tuition <- us_avg_tuition %>%
+  mutate(tuitfee_5yr_pct_chg = (`2015-16` - `2010-11`) / `2010-11` * 100) %>% 
+  gather(year, tuitfee, `2004-05`:`2015-16`) %>% 
+  select(state_abb, year, tuitfee, tuitfee_5yr_pct_chg) %>% 
+  filter(year == "2015-16")
+us_avg_tuition
+
+```
+
+#visualization
+
+```{r}
+us_avg_tuition %>% 
+  ggplot() +
+  geom_point(aes(color = tuitfee_5yr_pct_chg,
+                 x = fct_reorder(state_abb, tuitfee),
+                 y = tuitfee)) +
+  ggtitle("Average tuition and fees in the United States",
+          subtitle = "Average tuition and fees for one year of full-time study at public institutions, 2015-16") +
+  xlab("State") +
+  ylab("\nAverage Total Tuition and Fees") +
+  labs(color = "5-Yr % Chg\n",
+       caption = "Source: https://bit.ly/2EeBXpf") +
+  scale_y_continuous(labels = scales::dollar) +
+  scale_color_viridis() +
+  coord_flip() +
+  theme_minimal()
+```
+
