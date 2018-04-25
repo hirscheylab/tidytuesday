@@ -1,0 +1,82 @@
+title: "R Notebook for Tidy Tuesday"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook for the [#TidyTuesday](https://github.com/rfordatascience/tidytuesday/blob/master/README.md) challenge: a  weekly social data project (in R), which builds off #makeovermonday style projects but aimed at the R ecosystem. An emphasis will be placed on understanding how to summarize and arrange data to make meaningful charts with `ggplot2`, `tidyr`, `dplyr`, and other tools in the `tidyverse` ecosystem.
+
+This code is for Week 4, and my effort to reanalyze [these data]
+(https://data.gov.au/dataset/taxation-statistics-2013-14/resource/c506c052-be2f-4fba-8a65-90f9e60f7775?inner_span=True) to generate [this article](http://www.womensagenda.com.au/latest/eds-blog/australia-s-50-highest-paying-jobs-are-paying-men-significantly-more/)
+
+```{r}
+library(tidyverse, quietly = TRUE, warn.conflicts = FALSE) #because...duh
+library(viridis) #awesome color-blind friendly palette
+library(janitor)
+```
+
+#import data
+```{r}
+salary <- read.csv(url("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/week4_australian_salary.csv"))
+
+salary <- as_tibble(salary) %>% 
+  select(-X) %>% #drop unwanted column
+  clean_names() %>% #already clean, probalby don't need.
+  remove_empty(c("rows", "cols"))  #just in case, hard to know if there are empties
+
+salary
+```
+#clean occupation column; yikes. Thinking I'll keep the first name (pre-;) and drop the rest
+```{r}
+salary <- separate(salary, "occupation", "occupation", sep = ";") 
+salary <- separate(salary, "occupation", "occupation", sep = "\x96")
+  #mutate(gsub("[[:space]][[:punct:]]96[[:space]][[:punct:]]", "", salary$occupation, ignore.case = TRUE)) #another way, but didn't work
+salary
+
+#<- salary %>% mutate_at(vars("occupation"), as.character) #convert to char for next step (not required, as sep will convert)
+#
+```
+
+
+#filter some lists
+```{r}
+salary_groups <- salary %>% 
+  group_by(gender) %>% 
+  top_n(10) %>% 
+  summarise(total_dollars = sum(average_taxable_income), total_individuals = sum(individuals), average_top_10 = mean(average_taxable_income))
+salary_groups #this gives me some summary stats of the groups
+
+ranked <- salary %>% 
+  group_by(gender) %>% 
+  top_n(10) %>% 
+  arrange(desc(average_taxable_income))
+ranked #this checks the top 10 to see if they correspond to the article
+
+```
+
+```{r}
+salary_viz <- salary %>% 
+  group_by(gender) %>% 
+  top_n(50)
+salary_viz
+
+ggplot(salary_viz, aes(x = fct_reorder(occupation, average_taxable_income, .desc = FALSE), y = average_taxable_income, color = gender)) +
+  geom_point(size = 3, alpha = 0.7) +
+  scale_y_continuous(limits = c(100000,600000), breaks=c(100000,200000,300000,400000,500000,600000), minor_breaks = NULL, labels = scales::dollar) +
+  scale_color_manual(values = c("pink", "blue")) +
+  coord_flip() +
+  labs(y = "Average Taxable Income",x = "Occupation", title = "Australia’s 50 highest paying jobs") +
+  theme_minimal()
+
+```
+
+#save
+```{r}
+ggsave("au_salaries.png", last_plot(), height = 6, width = 8, units = "in", dpi = 600)
+```
+
+# Learned
+1. read.csv(url(http)) to read a file from a URL directly, instead of from a local directory
+2. fct_reorder(IN THE AES!)
+3. separate as a clever way to drop names in variables
